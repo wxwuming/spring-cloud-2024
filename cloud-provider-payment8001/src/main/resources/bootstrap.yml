@@ -1,7 +1,6 @@
 spring:
   application:
     name: cloud-payment-service
-
   cloud:
     consul:
       host: localhost
