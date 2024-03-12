@@ -1,3 +1,5 @@
+
+
 ## 一、Spring Cloud 各组件
 
 ### 服务注册与发现
@@ -182,7 +184,17 @@ public interface PayFeignApi {
 }
 ```
 
-默认超时时间60s
+```java
+@RestController
+public class OrderController {
+    @Resource
+    private PayFeignApi payFeignApi;
+}
+```
+
+#### 超时机制
+
+：默认超时时间60s
 
 ```xml
 spring:
@@ -209,5 +221,82 @@ spring:
             connectTimeout: 5000
             #读取超时时间
             readTimeout: 5000
+```
+
+#### 重试机制
+
+：Retryer对象
+
+```java
+@Configuration
+public class FeignConfig {
+
+    @Bean
+    public Retryer myRetryer(){
+        // 初始间隔时间为100ms，重试间最大间隔时间为1s，最大请求次数为3(1+2)
+        return new Retryer.Default(100,1,3);
+    }
+}
+
+```
+
+#### 默认HTTPClient修改
+
+```xml
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.openfeign</groupId>
+            <artifactId>feign-hc5</artifactId>
+            <version>13.1</version>
+        </dependency>
+```
+
+
+
+```yml
+spring:
+  cloud:
+    openfeign:
+      httpclient:
+        hc5:
+          enabled: true
+```
+
+#### 请求响应压缩功能
+
+```yml
+
+spring:
+  cloud:
+    openfeign:
+      compression:
+        request:
+          enabled: true
+          min-request-size: 2048 #最小触发压缩的大小
+          mime-types: text/xml,application/xml,application/json #触发压缩数据类型
+        response:
+          enabled: true
+```
+
+#### 日志打印功能
+
+```java
+    @Bean
+    Logger.Level feignLoggerLevel(){
+        return Logger.Level.FULL;
+    }
+```
+```yml
+logging:
+  level:
+    com:
+      wuming:
+        cloud:
+          apis:
+            PayFeignApi: debug
 ```
 
