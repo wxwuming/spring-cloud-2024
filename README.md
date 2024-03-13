@@ -300,3 +300,28 @@ logging:
             PayFeignApi: debug
 ```
 
+### 4.CircuitBreaker
+
+#### 简介
+
+一套规范和接口
+
+Resilience4j = Resilience Four Java
+
+落地的实现者是Resilience4j
+
+#### 服务熔断
+
+
+
+#### 服务降级
+
+#### 服务限流
+
+#### 服务限时
+
+#### 服务预热
+
+#### 接近实时的监控
+
+#### 兜底的处理动作
