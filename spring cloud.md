@@ -300,7 +300,7 @@ logging:
             PayFeignApi: debug
 ```
 
-### 4.CircuitBreaker
+### 4.CircuitBreaker(Resilience4j)
 
 #### 简介
 
