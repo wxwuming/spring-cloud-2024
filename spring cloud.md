@@ -310,18 +310,82 @@ Resilience4j = Resilience Four Java
 
 落地的实现者是Resilience4j
 
-#### 服务熔断
+#### 服务熔断、服务限流、服务限时
+
+闭合、断开、半开
+
+```yml
+spring:
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+        group:
+          enabled: true #没开分组永远不用分组的配置。精确优先、分组次之(开了分组)、默认最后
+          
+# Resilience4j CircuitBreaker 按照次数：COUNT_BASED 的例子
+#  6次访问中当执行方法的失败率达到50%时CircuitBreaker将进入开启OPEN状态(保险丝跳闸断电)拒绝所有请求。
+#  等待5秒后，CircuitBreaker 将自动从开启OPEN状态过渡到半开HALF_OPEN状态，允许一些请求通过以测试服务是否恢复正常。
+#  如还是异常CircuitBreaker 将重新进入开启OPEN状态；如正常将进入关闭CLOSE闭合状态恢复正常处理请求。
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failureRateThreshold: 50 #设置50%的调用失败时打开断路器，超过失败请求百分⽐CircuitBreaker变为OPEN状态。
+        slidingWindowType: COUNT_BASED # 滑动窗口的类型
+        slidingWindowSize: 6 #滑动窗⼝的⼤⼩配置COUNT_BASED表示6个请求，配置TIME_BASED表示6秒
+        minimumNumberOfCalls: 6 #断路器计算失败率或慢调用率之前所需的最小样本(每个滑动窗口周期)。如果minimumNumberOfCalls为10，则必须最少记录10个样本，然后才能计算失败率。如果只记录了9次调用，即使所有9次调用都失败，断路器也不会开启。
+        automaticTransitionFromOpenToHalfOpenEnabled: true # 是否启用自动从开启状态过渡到半开状态，默认值为true。如果启用，CircuitBreaker将自动从开启状态过渡到半开状态，并允许一些请求通过以测试服务是否恢复正常
+        waitDurationInOpenState: 5s #从OPEN到HALF_OPEN状态需要等待的时间
+        permittedNumberOfCallsInHalfOpenState: 2 #半开状态允许的最大请求数，默认值为10。在半开状态下，CircuitBreaker将允许最多permittedNumberOfCallsInHalfOpenState个请求通过，如果其中有任何一个请求失败，CircuitBreaker将重新进入开启状态。
+        recordExceptions:
+         - java.lang.Exception
+    instances:
+      cloud-payment-service:
+        baseConfig: default
+       
+# Resilience4j CircuitBreaker 按照时间：TIME_BASED 的例子
+resilience4j:
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 10s #神坑的位置，timelimiter 默认限制远程1s，超于1s就超时异常，配置了降级，就走降级逻辑
+  circuitbreaker:
+    configs:
+      default:
+        failureRateThreshold: 50 #设置50%的调用失败时打开断路器，超过失败请求百分⽐CircuitBreaker变为OPEN状态。
+        slowCallDurationThreshold: 2s #慢调用时间阈值，高于这个阈值的视为慢调用并增加慢调用比例。
+        slowCallRateThreshold: 30 #慢调用百分比峰值，断路器把调用时间⼤于slowCallDurationThreshold，视为慢调用，当慢调用比例高于阈值，断路器打开，并开启服务降级
+        slidingWindowType: TIME_BASED # 滑动窗口的类型
+        slidingWindowSize: 2 #滑动窗口的大小配置，配置TIME_BASED表示2秒
+        minimumNumberOfCalls: 2 #断路器计算失败率或慢调用率之前所需的最小样本(每个滑动窗口周期)。
+        permittedNumberOfCallsInHalfOpenState: 2 #半开状态允许的最大请求数，默认值为10。
+        waitDurationInOpenState: 5s #从OPEN到HALF_OPEN状态需要等待的时间
+        recordExceptions:
+          - java.lang.Exception
+    instances:
+      cloud-payment-service:
+        baseConfig: default
+
+```
 
 
 
 #### 服务降级
 
-#### 服务限流
+```java
+    @GetMapping(value = "/feign/pay/circuit/{id}")
+    @CircuitBreaker(name = "cloud-payment-service", fallbackMethod = "myCircuitFallback")
+    public String myCircuitBreaker(@PathVariable("id") Integer id)
+    {
+        return payFeignApi.myCircuit(id);
+    }
+    //myCircuitFallback就是服务降级后的兜底处理方法
+    public String myCircuitFallback(Integer id,Throwable t) {
+        // 这里是容错处理逻辑，返回备用结果
+        return "myCircuitFallback，系统繁忙，请稍后再试-----/(ㄒoㄒ)/~~";
+    }
+```
 
-#### 服务限时
+#### 舱壁隔离
 
-#### 服务预热
-
-#### 接近实时的监控
-
-#### 兜底的处理动作
