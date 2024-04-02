@@ -193,7 +193,7 @@ GC分代年龄为什么是15：Object Header采用4个bit位来保存年龄，0b
 
 ![image-20240329160441565](C:\Users\56511\AppData\Roaming\Typora\typora-user-images\image-20240329160441565.png)
 
-### CMS GC
+### CMS
 
 整个垃圾回收时间变长了，但是STW时间变短了，在垃圾回收过程中大部分时间用户线程还在执行，用户体验更好，但是吞吐量更低了（单位时间内执行的用户线程更少了）
 
@@ -203,7 +203,7 @@ GC分代年龄为什么是15：Object Header采用4个bit位来保存年龄，0b
 
 增量更新
 
-### G1 GC
+### G1
 
 堆内存会分为2048个region，每个region的大小等于堆内存除以2048（Eden、Survivor、Old、Humongous：大对象）
 
@@ -212,6 +212,209 @@ GC分代年龄为什么是15：Object Header采用4个bit位来保存年龄，0b
 初始标记、并发标记、最终标记、筛选回收
 
 自定义STW时间
+
+### ZGC
+
+- 停顿时间不超过10ms；
+- 停顿时间不会随着堆的大小，或者活跃对象的大小而增加；
+- 支持8MB~4TB级别的堆（未来支持16TB）。
+
+
+
+## 默认垃圾回收器
+
+JDK5-JDK8：Parallel
+
+JDK9-JDK21：G1
+
+## 性能调优
+
+JVM
+
+## 编译器优化
+
+## 执行模式
+
+# JUC
+
+## JUC概述
+
+### JUC是什么
+
+java.util.concurrent包的简称（java并发编程工具包），在Java1.5添加，目的就是为了更好的支持高并发任务。让开发者进行多线程编程时减少竞争条件和死锁的问题。
+
+### 进程和线程的区别
+
+进程：一个运行中的程序集合
+
+线程：操作系统能够进行运算调度的最小单位
+
+### 并发和并行的区别
+
+并发(多线程操作同一个资源,交替执行)
+CPU一核, 模拟出来多条线程,天下武功,唯快不破,快速交替
+并行(多个人一起行走, 同时进行)
+CPU多核,多个线程同时进行 ; 使用线程池操作
+
+### 线程的五个状态
+
+#### 操作系统层面
+
+1. **新建** New
+2. **就绪** Runnable
+3. **运行** Running
+4. **阻塞** Blocked
+5. **死亡** Dead
+
+#### Java层面
+
+1. **新建** New
+2. **运行** Runnable
+3. **阻塞** Blocked
+4. **等待** Waiting
+5. **计时等待** Timed Waiting
+6. **终止** Terminated
+
+### wait/sleep的区别
+
+1. 来自不同的类： wait来自object类, sleep来自线程类
+2. 关于锁的释放：wait会释放锁, sleep不会释放锁
+3. 使用的范围不同： wait必须在同步代码块中， sleep可以在任何地方睡眠
+
+### 管程
+
+Monitor 监视器，JVM中的同步基于进入和退出，使用管程对象实现的。
+
+### 用户线程和守护线程
+
+用户线程：自定义线程
+
+守护线程：GC线程
+
+主线程结束了，用户线程还没结束，jvm存活
+
+没有用户线程了，只有守护线程，jvm结束
+
+## Lock接口
+
+- Lock和Synchronized的最大区别在于，synchronized是自动上锁和释放锁，Lock是需要用户手动上锁和释放锁。
+- Lock是接口，synchronized是关键字
+- Lock发生异常时，如果没有主动unLock()去释放锁，则很可能造成死锁的产生，因此需要在finally中释放锁。synchronized发生异常时，会自动释放锁，不会导致死锁的产生。
+- Lock可以让等待锁的线程响应中断，而synchronized却不能够响应中断。
+- Lock可以知道有没有成功获取到锁，synchronized不能知道
+- Lock可以提高多线程进行读操作的效率
+
+在性能上说，如果竞争资源不激烈，两者性能差不多。当竞争资源非常激烈时，Lock的性能要远优于synchronized。
+
+ReentrantLock：可重入锁
+
+Thread调用start方法时，不一定会马上创建线程，需要由操作系统决定（private **native** void start0();）
+
+## 线程间通信
+
+虚假唤醒问题：wait()在哪里睡就在哪里醒，判断条件用while循环中处理。
+
+synchronized：
+
+wait()等待
+
+notifyAll()唤醒
+
+Lock：
+
+```
+private Lock lock = new ReentrantLock();
+
+private Condition condition = lock.newCondition();
+```
+
+condition.await()等待
+
+condition.signalAll()唤醒
+
+## 线程间定制化通讯
+
+创建多个Condition表示不同的队列，通过队列控制线程的等待和唤醒。
+
+condition1.await()线程aa等待
+
+condition2.signal()唤醒线程bb
+
+condition2.await()线程bb等待
+
+condition3.signal()唤醒线程cc
+
+condition3.await()线程cc等待
+
+condition1.signal()唤醒线程aa
+
+```
+private int flag = 1;   // 1:aa 2:bb 3:cc
+private Lock lock = new ReentrantLock();
+private Condition condition1 = lock.newCondition(); // aa
+private Condition condition2 = lock.newCondition(); // bb
+private Condition condition3 = lock.newCondition(); // cc
+```
+
+## 集合的线程安全
+
+### List集合线程不安全的问题
+
+源码中add没有使用synchronized和Lock锁，所以是线程不安全的
+
+处理ConcurrentModificationException并发修改异常：Vector、Collections、CopyOnWriteArrayList
+
+Vector：类型中的add使用了synchronized关键字处理并发问题
+
+```
+// Vector解决
+List<String> list = new Vector();
+```
+
+Collections：在list的操作外包了一层synchronized关键字
+
+```
+// Collections解决
+List<String> list = Collections.synchronizedList(new ArrayList<>());
+```
+
+CopyOnWriteArrayList：写时复制技术
+
+```
+// CopyOnWriteArrayList解决
+List<String> list = new CopyOnWriteArrayList<>();
+```
+
+### HashSet线程不安全的问题
+
+源码中add没有使用synchronized和Lock锁，所以是线程不安全的
+
+处理ConcurrentModificationException并发修改异常：CopyOnWriteArraySet
+
+```
+// CopyOnWriteArraySet解决
+Set<String> set = new CopyOnWriteArraySet<>();
+```
+
+### HashMap线程不安全的问题
+
+源码中put没有使用synchronized和Lock锁，所以是线程不安全的
+
+处理ConcurrentModificationException并发修改异常：ConcurrentHashMap
+
+```
+// ConcurrentHashMap解决
+Map<String,String> map = new ConcurrentHashMap<>();
+```
+
+## 多线程锁
+
+synchronized它修饰的对象有以下几种：
+1. 修饰一个代码块，被修饰的代码块称为同步语句块，其作用的范围是大括号{}括起来的代码，作用的对象是调用这个代码块的对象；
+2. 修饰一个普通方法，被修饰的方法称为同步方法，其作用的范围是整个方法，作用的对象是调用这个方法的对象；
+3. 修饰一个静态的方法，其作用的范围是整个静态方法，作用的对象是这个类的所有对象；
+
+## 公平锁和非公平锁
 
 # MYSQL
 
