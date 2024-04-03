@@ -322,7 +322,7 @@ notifyAll()唤醒
 
 Lock：
 
-```
+```java
 private Lock lock = new ReentrantLock();
 
 private Condition condition = lock.newCondition();
@@ -348,7 +348,7 @@ condition3.await()线程cc等待
 
 condition1.signal()唤醒线程aa
 
-```
+```java
 private int flag = 1;   // 1:aa 2:bb 3:cc
 private Lock lock = new ReentrantLock();
 private Condition condition1 = lock.newCondition(); // aa
@@ -366,21 +366,21 @@ private Condition condition3 = lock.newCondition(); // cc
 
 Vector：类型中的add使用了synchronized关键字处理并发问题
 
-```
+```java
 // Vector解决
 List<String> list = new Vector();
 ```
 
 Collections：在list的操作外包了一层synchronized关键字
 
-```
+```java
 // Collections解决
 List<String> list = Collections.synchronizedList(new ArrayList<>());
 ```
 
 CopyOnWriteArrayList：写时复制技术
 
-```
+```java
 // CopyOnWriteArrayList解决
 List<String> list = new CopyOnWriteArrayList<>();
 ```
@@ -391,7 +391,7 @@ List<String> list = new CopyOnWriteArrayList<>();
 
 处理ConcurrentModificationException并发修改异常：CopyOnWriteArraySet
 
-```
+```java
 // CopyOnWriteArraySet解决
 Set<String> set = new CopyOnWriteArraySet<>();
 ```
@@ -402,7 +402,7 @@ Set<String> set = new CopyOnWriteArraySet<>();
 
 处理ConcurrentModificationException并发修改异常：ConcurrentHashMap
 
-```
+```java
 // ConcurrentHashMap解决
 Map<String,String> map = new ConcurrentHashMap<>();
 ```
@@ -414,7 +414,326 @@ synchronized它修饰的对象有以下几种：
 2. 修饰一个普通方法，被修饰的方法称为同步方法，其作用的范围是整个方法，作用的对象是调用这个方法的对象；
 3. 修饰一个静态的方法，其作用的范围是整个静态方法，作用的对象是这个类的所有对象；
 
-## 公平锁和非公平锁
+### 公平锁和非公平锁
+
+ReentrantLock构造函数传参（true公平锁：false非公平锁），无参默认非公平锁
+
+```java
+/**
+ * Creates an instance of {@code ReentrantLock}.
+ * This is equivalent to using {@code ReentrantLock(false)}.
+ */
+public ReentrantLock() {
+    sync = new NonfairSync();
+}
+
+/**
+ * Creates an instance of {@code ReentrantLock} with the
+ * given fairness policy.
+ *
+ * @param fair {@code true} if this lock should use a fair ordering policy
+ */
+public ReentrantLock(boolean fair) {
+    sync = fair ? new FairSync() : new NonfairSync();
+}
+```
+
+非公平锁：会造成一个线程把活全干了，其他线程饿死（效率高）
+
+公平锁：雨露均沾，所有线程全干活（效率低），检查当前线程是否有前驱节点，即是否其他线程正在等待获取锁
+
+### 可重入锁
+
+synchronized（隐式）和 Lock（显式）都是可重入锁，可递归调用
+
+synchronized自动释放锁
+
+Lock需要有上锁就要有解锁
+
+### 死锁
+
+#### 什么是死锁
+
+是指多个线程在运行过程中因争夺资源而造成的一种相互等待的现象，如果没有外力干涉，他们就无法再继续执行下去。
+
+#### 产生死锁的原因
+
+1. 系统资源不足
+2. 进程运行推进的顺序不当
+3. 资源分配不当
+
+#### 产生死锁的必要条件
+
+1. 互斥条件：进程要求对所分配的资源进行排它性控制，即在一段时间内某资源仅为一进程所占用。
+
+2. 请求和保持条件：当进程因请求资源而阻塞时，对已获得的资源保持不放。
+3. 不剥夺条件：进程已获得的资源在未使用完之前，不能剥夺，只能在使用完时由自己释放。
+4. 环路等待条件：在发生死锁时，必然存在一个进程--资源的环形链。
+
+#### 解决死锁的办法
+
+
+
+#### 验证是否是死锁
+
+1. jps 类似Linux ps -ef
+2. jstack jvm自带的跟踪工具
+
+## 创建线程的方式
+
+1. 继承Thread
+2. 实现Runable
+3. Callable接口
+4. 线程池方式
+
+## Callable
+
+有返回值、会抛出异常、call()方法
+
+FutrueTask()未来任务
+
+run()运行线程
+
+get()获取返回值，阻塞直到线程返回值
+
+```java
+FutureTask<Integer> futureTask2 = new FutureTask<>(() -> {
+    return 1024;
+});
+
+new Thread(futureTask2, "AA").start();
+
+while (!futureTask2.isDone()) {
+    System.out.println("wait...");
+}
+System.out.println(futureTask2.get());
+System.out.println("over");
+```
+
+## JUC的辅助类
+
+### 减少计数CountDownLatch
+
+可以使一个获多个线程等待其他线程各自执行完毕后再执行。
+
+await()使当前线程阻塞，直到计数器值为0
+
+countDown()计数器的值-1
+
+可以解决那些一个或者多个线程在执行之前必须依赖于某些必要的前提业务先执行的场景。
+
+```java
+CountDownLatch countDownLatch = new CountDownLatch(6);
+for (int i = 1; i <= 6; i++) {
+    int finalI = new Random().nextInt(1,6);
+    new Thread(() -> {
+        try {
+            TimeUnit.SECONDS.sleep(finalI);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println(Thread.currentThread().getName() + "号同学离开教室");
+        countDownLatch.countDown();
+    }, String.valueOf(i)).start();
+}
+countDownLatch.await();
+System.out.println("班长锁门");
+```
+
+### 循环栅栏CyclicBarrier
+
+可以实现一组线程相互等待，当所有线程都到达某个屏障点后再进行后续的操作。
+
+await()当前线程等待，直到等待线程达到设置值就执行设置的线程。
+
+```java
+private static final int NUMBER = 7;
+
+public static void main(String[] args) {
+    CyclicBarrier cyclicBarrier = new CyclicBarrier(NUMBER, () -> {
+        System.out.println("集齐7颗龙珠，召唤神龙");
+    });
+    for (int i = 1; i <= NUMBER; i++) {
+        int finalI = new Random().nextInt(10);
+        new Thread(()->{
+            try {
+                TimeUnit.SECONDS.sleep(finalI);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println(Thread.currentThread().getName()+" 星龙珠被收集");
+            try {
+                cyclicBarrier.await();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            } catch (BrokenBarrierException e) {
+                throw new RuntimeException(e);
+            }
+        },String.valueOf(i)).start();
+    }
+}
+```
+
+### 信号量Semaphore
+
+可以用来控制同时访问特定资源的线程数量，通过协调各个线程，以保证合理的使用资源。
+
+acquire()获取令牌
+
+release()释放令牌
+
+new Semaphore(3)设置3各令牌
+
+```java
+public static void main(String[] args) {
+    Semaphore semaphore = new Semaphore(3);
+    for (int i = 1; i <= 6; i++){
+        new Thread(()->{
+            try {
+                semaphore.acquire();
+                System.out.println(Thread.currentThread().getName()+"号车进入停车场");
+                TimeUnit.SECONDS.sleep(new Random().nextInt(5));
+                System.out.println(Thread.currentThread().getName()+"号车------离开停车场");
+                semaphore.release();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        },String.valueOf(i)).start();
+    }
+}
+```
+
+## ReentrantReadWriteLock读写锁
+
+### 乐观锁
+
+乐观锁是一种基于数据版本控制的锁机制，它假设多个事务在同一时间对同一数据进行操作时，大部分情况下不会产生冲突。乐观锁的实现方式通常是在数据表中增加一个版本号或时间戳字段，当数据被读取时，记录下当前版本号或时间戳；当数据被更新时，检查当前版本号或时间戳是否与读取时的一致，如果不一致，则说明数据已被其他事务修改，当前事务执行失败。
+
+### 悲观锁
+
+悲观锁假设多个事务在同一时间对同一数据进行操作时很可能会产生冲突，因此在数据被访问前就先加锁，防止其他事务对数据进行修改。悲观锁的实现方式通常是在数据表中增加一个锁定字段，当数据被读取时，将该字段设置为锁定状态；当数据被更新时，检查该字段的状态，如果处于锁定状态，则说明数据已被其他事务修改，当前事务执行失败。
+
+在操作资源前上锁，操作完成后解锁
+
+只能一个一个操作，无法做到并发操作（效率低）
+
+### 表锁
+
+在操作表数据时，锁整个表
+
+### 行锁
+
+在操作行数据时，锁当前行
+
+会发生死锁
+
+### 读锁
+
+共享锁，死锁
+
+两个线程读同一条数据，并对数据进行修改时就会发生死锁的情况。
+
+### 写锁
+
+独占锁，死锁
+
+两个线程分别写两条数据，恰好两个线程又同时写了对方的数据导致互相等待发生死锁问题。
+
+### 读写锁
+
+一个资源可以被多个读的线程访问，或被一个写的线程访问，但是不能同时存在读写线程，“读写互斥、读读共享”。
+
+```java
+class MyCache {
+    private volatile Map<String, Object> map = new HashMap<>();
+
+    private ReadWriteLock rwLock = new ReentrantReadWriteLock();
+
+    public void put(String key, Object value) {
+        rwLock.writeLock().lock();
+        try {
+            System.out.println(Thread.currentThread().getName() + "正在写入" + key);
+            try {
+                TimeUnit.SECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            map.put(key, value);
+            System.out.println(Thread.currentThread().getName() + "写入完成");
+        } catch (RuntimeException e) {
+            throw new RuntimeException(e);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    public Object get(String key) {
+        rwLock.readLock().lock();
+        try {
+            Object result = null;
+            System.out.println(Thread.currentThread().getName() + "正在读取" + key);
+            try {
+                TimeUnit.SECONDS.sleep(3);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            result = map.get(key);
+            System.out.println(Thread.currentThread().getName() + "读取完成");
+            return result;
+        } catch (RuntimeException e) {
+            throw new RuntimeException(e);
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+}
+```
+
+### 读写锁的演变
+
+1. 无锁，多线程抢占资源
+2. 添加锁，synchronized和ReentrantLock都是独占锁，每次只能来一个操作，缺点：不能共享
+3. 读写锁，ReentrantReadWriteLock，读读共享，提升性能，同时多人进行读操作，缺点：1.容易造成锁饥饿，一直读没有写操作，2.读时不能进行写操作，写操作时可以读。
+
+### 锁降级
+
+写入锁降级为读锁：获取写锁，获取读锁，释放写锁，释放读锁
+
+```java
+ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+ReentrantReadWriteLock.ReadLock readLock = rwLock.readLock();
+ReentrantReadWriteLock.WriteLock writeLock = rwLock.writeLock();
+
+// 获取写锁
+writeLock.lock();
+System.out.println("wuming");
+
+// 获取读锁
+readLock.lock();
+System.out.println("------read");
+
+// 释放写锁
+writeLock.unlock();
+
+// 释放读锁
+readLock.unlock();
+```
+
+## BlockingQueue阻塞队列
+
+### 概述
+
+队列：先进先出
+
+当队列为空时，从队列获取元素的操作将会阻塞
+
+当队列为满时，向队列添加元素的操作将会阻塞
+
+在某些情况下会自动挂起线程，一旦条件满足，被挂起的线程又会自动被唤醒
+
+好处：不需要关注什么时候阻塞线程，什么时候唤醒线程
+
+### 
 
 # MYSQL
 
