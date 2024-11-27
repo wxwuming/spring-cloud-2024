@@ -151,7 +151,7 @@ GC分代年龄为什么是15：Object Header采用4个bit位来保存年龄，0b
 
 - 注意，在实际的可达性分析过程中，还涉及到弱引用、软引用、虚引用和终结器引用等类型的引用处理，不同的引用类型对对象的可达性有不同的影响。
 
-#### 标记清除算法
+### 标记清除算法
 
 当堆中的有效内存空间（available memory）被耗尽的时候，就会停止整个程序（也被称为stop the world），然后进行两项工作，第一项则是标记，第二项则是清除。
 
@@ -165,7 +165,7 @@ GC分代年龄为什么是15：Object Header采用4个bit位来保存年龄，0b
 - 在进行GC的时候，需要停止整个应用程序，用户体验较差。
 - 这种方式清理出来的空闲内存是不连续的，产生内碎片，需要维护一个空闲列表。
 
-#### 复制算法
+复制算法
 
 将原有的内存空间分为两块，每次只使用其中的一块，在垃圾回收时候，将正在使用的内存中的存活对象复制到为未使用的内存中，清除正在使用的内存块中的所有对象，交换两个内存的角色，完成垃圾回收。
 
@@ -173,13 +173,13 @@ GC分代年龄为什么是15：Object Header采用4个bit位来保存年龄，0b
 
 复制算法对空间有一定的浪费。只能使用一半的空间。
 
-#### 标记整理算法
+### 标记整理算法
 
 根据老年代的特点，有人对“标记 - 清除”进行改进，提出了“标记 - 整理”算法。“标记 - 整理”算法的标记过程与“标记 - 清除”算法相同，但后续步骤不是直接对可回收对象进行清理，而是让所有存活的对象都向一端移动，然后直接清理掉端边界以外的内存。
 
 分为三个阶段，标记、移动、清除，导致效率低
 
-#### 分代收集算法
+### 分代收集算法
 
 不同对象的存活时长是不一样的，也就可以针对不同的对象采取不同的垃圾回收算法。
 
@@ -733,7 +733,105 @@ readLock.unlock();
 
 好处：不需要关注什么时候阻塞线程，什么时候唤醒线程
 
-### 
+### 阻塞队列的分类
+
+#### **ArrayBlockingQueue**
+
+基于数组的有界阻塞队列
+
+#### **LinkedBlockingQueue**
+
+基于链表的有界阻塞队列
+
+#### DelayQueue
+
+使用优先队列实现的延迟无界阻塞队列
+
+#### PriorityBlockingQueue
+
+支持优先级排序的无界阻塞队列
+
+#### SyschronousQueue
+
+单元素队列
+
+#### LinkedTransferQueue
+
+由链表组成的无界阻塞队列
+
+#### LinkedBlockintDeque
+
+由链表组成的双向阻塞队列
+
+### 阻塞队列的常用方法
+
+| 方法类型 | 抛出异常  | 特殊值   | 阻塞   | 超时               |
+| -------- | --------- | -------- | ------ | ------------------ |
+| 插入     | add(e)    | offer(e) | put(e) | offer(e,time,unit) |
+| 移除     | remove()  | poll()   | take() | poll(time,unit)    |
+| 检查     | element() | peek()   | 不可用 | 不可以             |
+
+## ThreadPool线程池
+
+### 线程池的使用
+
+#### 1.Executors.newFixedThreadPool(int)
+
+一池n线程
+
+#### 2.Executors.newSingleThreadExecutor()
+
+一池一线程
+
+#### 3.Executors.newCachedThreadPool()
+
+一池可扩容线程
+
+全部由ThreadPoolExecutor创建
+
+int corePoolSize,	常驻线程数量
+int maximumPoolSize,		最大线程数量
+long keepAliveTime,		线程存活时间
+TimeUnit unit,		时间单位
+BlockingQueue<Runnable> workQueue,		工作阻塞队列
+ThreadFactory threadFactory,		线程工厂
+RejectedExecutionHandler handler		拒绝策略
+
+### 线程池的工作流程
+
+常驻线程 =》 阻塞队列 =》 创建新线程 =》 拒绝策略
+
+### 拒绝策略
+
+AbortPolicy默认：抛出异常
+
+CallerRunsPolicy：调用者运行，不抛弃任务，也不抛出异常，将任务退回到调用者
+
+DiscardOldestPolicy：抛弃队列中等待最久的任务，然后把当前任务加入队列中尝试再次提交当前任务
+
+DiscardPolicy：默默丢掉无法处理的任务，不做任何处理也不抛出异常
+
+### 自定义线程池
+
+```java
+ExecutorService threadPool = new ThreadPoolExecutor(
+        2,
+        5,
+        10,
+        TimeUnit.SECONDS,
+        new ArrayBlockingQueue<>(3),
+        Executors.defaultThreadFactory(),
+        new ThreadPoolExecutor.AbortPolicy()
+);
+```
+
+## Fork/Join分支合并框架
+
+是以递归方式将可以并行的任务拆分成更小的任务，然后将每个子任务的结果合并起来生成整体结果
+
+## CompletableFuture异步回调
+
+
 
 # MYSQL
 

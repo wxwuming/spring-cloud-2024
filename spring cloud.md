@@ -165,6 +165,8 @@ public RestTemplate restTemplate(){
 
 ### 3.openFeign
 
+负载均衡喝远程接口调用
+
 @FeignClient注解接口
 
 ```java
@@ -302,6 +304,8 @@ logging:
 
 ### 4.CircuitBreaker(Resilience4j)
 
+服务熔断、服务限流、服务限时
+
 #### 简介
 
 一套规范和接口
@@ -310,7 +314,7 @@ Resilience4j = Resilience Four Java
 
 落地的实现者是Resilience4j
 
-#### 服务熔断、服务限流、服务限时
+服务熔断、服务限流、服务限时
 
 闭合、断开、半开
 
@@ -366,7 +370,50 @@ resilience4j:
     instances:
       cloud-payment-service:
         baseConfig: default
+  
+####resilience4j bulkhead 的例子
+resilience4j:
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 2 # 隔离允许并发线程执行的最大数量
+                maxWaitDuration: 1s # 当达到并发调用数量时，新的线程的阻塞时间，我只愿意等待1秒，过时不候进舱壁兜底fallback
+    instances:
+      cloud-payment-service:
+        baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 20s
+        
+####resilience4j bulkhead -THREADPOOL的例子
+resilience4j:
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 10s #timelimiter默认限制远程1s，超过报错不好演示效果所以加上10秒
+  thread-pool-bulkhead:
+    configs:
+      default:
+        core-thread-pool-size: 1
+        max-thread-pool-size: 1
+        queue-capacity: 1
+    instances:
+      cloud-payment-service:
+        baseConfig: default
+# spring.cloud.openfeign.circuitbreaker.group.enabled 请设置为false 新启线程和原来主线程脱离
 
+####resilience4j ratelimiter 限流的例子
+resilience4j:
+  ratelimiter:
+    configs:
+      default:
+        limitForPeriod: 2 #在一次刷新周期内，允许执行的最大请求数
+        limitRefreshPeriod: 1s # 限流器每隔limitRefreshPeriod刷新一次，将允许处理的最大请求数量重置为limitForPeriod
+        timeout-duration: 1 # 线程等待权限的默认等待时间
+    instances:
+        cloud-payment-service:
+          baseConfig: default
 ```
 
 
@@ -389,3 +436,65 @@ resilience4j:
 
 #### 舱壁隔离
 
+##### SemaphoreBulkhead
+
+```java
+/**
+ *(船的)舱壁,隔离
+ * @param id
+ * @return
+ */
+@GetMapping(value = "/feign/pay/bulkhead/{id}")
+@Bulkhead(name = "cloud-payment-service",fallbackMethod = "myBulkheadFallback",type = Bulkhead.Type.SEMAPHORE)
+public String myBulkhead(@PathVariable("id") Integer id)
+{
+    return payFeignApi.myBulkhead(id);
+}
+public String myBulkheadFallback(Throwable t)
+{
+    return "myBulkheadFallback，隔板超出最大数量限制，系统繁忙，请稍后再试-----/(ㄒoㄒ)/~~";
+}
+```
+
+##### FixedThreadPoolBulkhead
+
+```java
+/**
+ * (船的)舱壁,隔离,THREADPOOL
+ * @param id
+ * @return
+ */
+@GetMapping(value = "/feign/pay/bulkhead/{id}")
+@Bulkhead(name = "cloud-payment-service",fallbackMethod = "myBulkheadPoolFallback",type = Bulkhead.Type.THREADPOOL)
+public CompletableFuture<String> myBulkheadTHREADPOOL(@PathVariable("id") Integer id)
+{
+    System.out.println(Thread.currentThread().getName()+"\t"+"enter the method!!!");
+    try { TimeUnit.SECONDS.sleep(3); } catch (InterruptedException e) { e.printStackTrace(); }
+    System.out.println(Thread.currentThread().getName()+"\t"+"exist the method!!!");
+
+    return CompletableFuture.supplyAsync(() -> payFeignApi.myBulkhead(id) + "\t" + " Bulkhead.Type.THREADPOOL");
+}
+public CompletableFuture<String> myBulkheadPoolFallback(Integer id,Throwable t)
+{
+    return CompletableFuture.supplyAsync(() -> "Bulkhead.Type.THREADPOOL，系统繁忙，请稍后再试-----/(ㄒoㄒ)/~~");
+}
+```
+
+#### 服务限流
+
+```java
+@GetMapping(value = "/feign/pay/ratelimit/{id}")
+@RateLimiter(name = "cloud-payment-service",fallbackMethod = "myRatelimitFallback")
+public String myBulkhead(@PathVariable("id") Integer id)
+{
+    return payFeignApi.myRatelimit(id);
+}
+public String myRatelimitFallback(Integer id,Throwable t)
+{
+    return "你被限流了，禁止访问/(ㄒoㄒ)/~~";
+}
+```
+
+### 3.Sleuth(Micrometer)+ZipKin
+
+分布式链路追踪
